@@ -1,29 +1,89 @@
-import time
+import pandas as pd
+import matplotlib.pyplot as plt
 from board_and_rules import Connect4, minimax
+from td_agent import TDAgent, train_td_agent
+
+
+RESULTADOS_FILE = "resultados.csv"
+
+
+def guardar_resultado(modo, ganador):
+    # Guarda el resultado de cada partida en un archivo CSV.
+    try:
+        df = pd.read_csv(RESULTADOS_FILE)
+    except FileNotFoundError:
+        df = pd.DataFrame(columns=["modo", "ganador"])
+
+    df = pd.concat([df, pd.DataFrame({"modo": [modo], "ganador": [ganador]})], ignore_index=True)
+    df.to_csv(RESULTADOS_FILE, index=False)
+
+
+def graficar_resultados():
+    # Genera y actualiza una gráfica con los resultados de las partidas.
+    try:
+        df = pd.read_csv(RESULTADOS_FILE)
+    except FileNotFoundError:
+        print("No hay datos para graficar aún.")
+        return
+
+    conteo = df.groupby(["modo", "ganador"]).size().unstack(fill_value=0)
+
+    # Modos de juego
+    modos = ["1 - Jugador vs TDL", "2 - TDL vs Minimax", "3 - TDL vs Minimax+Poda"]
+    ganadores = ["Jugador", "Minimax", "Empate", "TDL"]
+
+    # Asegurar que todas las combinaciones tengan valores (evita errores si no hay datos)
+    for ganador in ganadores:
+        if ganador not in conteo.columns:
+            conteo[ganador] = 0
+
+    conteo = conteo[ganadores]
+
+    ax = conteo.plot(kind="bar", figsize=(9, 6), width=0.7, colormap="viridis")
+
+    plt.title("Resultados de las partidas")
+    plt.xlabel("Modo de juego")
+    plt.ylabel("Cantidad de victorias")
+    plt.xticks(ticks=range(len(modos)), labels=modos, rotation=0)
+    plt.legend(title="Ganador", labels=ganadores)
+    plt.grid(axis="y", linestyle="--", alpha=0.7)
+    plt.tight_layout()
+    plt.savefig("grafica_resultados.png")
+    plt.show()
 
 
 def play_game():
+    td_agent = TDAgent()
+    game = Connect4()
+
+    print("Agente de TD learning entrenando")
+    train_td_agent(agent=td_agent, game=game, episodes=5000)
+    print("El agente a terminado de entrenar")
+
     while True:
-        game = Connect4()
+        game.reset()
+
+        print("\nElige el modo de juego:")
+        print("1 - Jugador vs IA (TD Learning)")
+        print("2 - IA (TDL) vs IA (Minimax sin poda)")
+        print("3 - IA (TDL) vs IA (Minimax con poda)")
+        print("4 - Ver gráficas")
+
+        mode = input("\nIngresa el número de la opción: ")
+
+        if mode == "4":
+            graficar_resultados()
+            continue
+
         turn = 1
-
-        mode = input(
-            "Elige el modo de juego: \n1 (Humano vs IA) \no \n2 (IA vs IA - Sin poda vs Con poda) \n"
-        )
-        human_players = mode == "1"
-
-        timer_1 = 0
-        timer_2 = 0
-
         while True:
             game.print_board()
             player = 1 if turn % 2 != 0 else 2
 
-            if human_players and player == 1:
+            if mode == "1" and player == 1:
+                # Modo 1: Jugador vs IA (TD Learning)
                 try:
-                    column = (
-                        int(input(f"Jugador {player}, elige una columna (1-7): ")) - 1
-                    )
+                    column = int(input(f"Jugador {player}, elige una columna (1-7): ")) - 1
                 except ValueError:
                     print("Entrada inválida. Intenta nuevamente.")
                     continue
@@ -38,47 +98,32 @@ def play_game():
 
                 game.drop_piece(column, player)
             else:
-                use_alpha_beta = player == 2
-                start_time = time.time()
-                column, _ = minimax(
-                    game, 4, -float("inf"), float("inf"), True, player, use_alpha_beta
-                )
-                elapsed_time = time.time() - start_time
-
-                if player == 1:
-                    timer_1 += elapsed_time
+                if (mode == "1" and player == 2) or mode in ["2", "3"]:
+                    # IA (TD Learning) juega
+                    valid_actions = game.get_valid_columns()
+                    column = td_agent.select_action(game.board, valid_actions)
                 else:
-                    timer_2 += elapsed_time
+                    # IA (Minimax) juega
+                    use_alpha_beta = mode == "3"
+                    column, _ = minimax(game, 4, -float("inf"), float("inf"), True, player, use_alpha_beta)
 
-                print(
-                    "------------------------------------player: ",
-                    player,
-                    "esta usando alpha_beta?: ",
-                    use_alpha_beta,
-                    "tiempo tomado: ",
-                    round(elapsed_time, 4),
-                    "s ------------------------------------",
-                )
+                print(f"Jugador {player} elige la columna: {column+1}")
                 game.drop_piece(column, player)
-                print(
-                    f"Jugador {player} (AI{' con poda' if use_alpha_beta else ' sin poda'}) elige la columna: {column+1}"
-                )
 
+            # Verificar ganador
             if game.check_winner(player):
                 game.print_board()
                 print(f"¡Jugador {player} ha ganado!")
+                guardar_resultado(mode, "TDL" if player == 1 else "Minimax")
                 break
 
             if len(game.get_valid_columns()) == 0:
                 game.print_board()
                 print("¡Empate!")
+                guardar_resultado(mode, "Empate")
                 break
 
             turn += 1
-
-        print("\nTiempo total:")
-        print(f"AI sin poda: {round(timer_1, 4)} s")
-        print(f"AI con poda: {round(timer_2, 4)} s")
 
         replay = input("¿Quieres jugar de nuevo? (s/n): ").lower()
         if replay != "s":

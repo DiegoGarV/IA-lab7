@@ -64,6 +64,10 @@ class Connect4:
 
     """HASTA AQUÍ LLEGÓ LO QUE ME DIÓ CHAT CON EL PROMPT"""
 
+    def reset(self):
+        # Reinicia el tablero a su estado inicial.
+        self.board = np.zeros((self.rows, self.columns), dtype=int)
+    
     def evaluate_line(self, line, player):
         # Evalua una linea de 4 casillas para ver cuantas piezas le pertenece a cada jugador
         # Las 4 casillas pueden estár horizontal, vertical o diagonal
