@@ -6,6 +6,7 @@ import random
 import matplotlib.pyplot as plt
 from collections import deque
 
+
 class TDNetwork(nn.Module):
     def __init__(self, input_size, hidden_size, output_size):
         super(TDNetwork, self).__init__()
@@ -14,7 +15,7 @@ class TDNetwork(nn.Module):
             nn.ReLU(),
             nn.Linear(hidden_size, hidden_size),
             nn.ReLU(),
-            nn.Linear(hidden_size, output_size)
+            nn.Linear(hidden_size, output_size),
         )
 
     def forward(self, x):
@@ -23,8 +24,8 @@ class TDNetwork(nn.Module):
 
 class TDAgent:
     def __init__(self, alpha=0.01, gamma=0.95, epsilon=0.1, batch_size=32):
-        self.alpha = alpha      # Tasa de aprendizaje
-        self.gamma = gamma      # Factor de descuento
+        self.alpha = alpha  # Tasa de aprendizaje
+        self.gamma = gamma  # Factor de descuento
         self.epsilon = epsilon  # Probabilidad de exploración
         self.batch_size = batch_size
 
@@ -75,6 +76,7 @@ class TDAgent:
         loss.backward()
         self.optimizer.step()
 
+
 def train_td_agent(game, agent, episodes=1000, print_every=100):
     win_rates = []
     wins = 0
@@ -87,7 +89,7 @@ def train_td_agent(game, agent, episodes=1000, print_every=100):
         while not done:
             player = 1 if turn % 2 != 0 else 2
             valid_moves = game.get_valid_columns()
-            
+
             if not valid_moves:
                 done = True
                 break
@@ -110,9 +112,9 @@ def train_td_agent(game, agent, episodes=1000, print_every=100):
             agent.update_q_values(game.board, action, reward, next_board, done)
 
             if len(game.get_valid_columns()) == 0:
-                done = True  
+                done = True
 
-            turn += 1  
+            turn += 1
 
         if (episode + 1) % print_every == 0:
             win_rate = wins / print_every

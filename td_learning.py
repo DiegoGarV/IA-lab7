@@ -13,7 +13,7 @@ class TDNetwork(nn.Module):
             nn.ReLU(),
             nn.Linear(hidden_size, hidden_size),
             nn.ReLU(),
-            nn.Linear(hidden_size, output_size)
+            nn.Linear(hidden_size, output_size),
         )
 
     def forward(self, x):
@@ -21,7 +21,17 @@ class TDNetwork(nn.Module):
 
 
 class TDAgent:
-    def __init__(self, alpha=0.0001, gamma=0.99, epsilon=1.0, min_epsilon=0.01, decay_rate=0.995, input_size=42, hidden_size=128, output_size=7):
+    def __init__(
+        self,
+        alpha=0.0001,
+        gamma=0.99,
+        epsilon=1.0,
+        min_epsilon=0.01,
+        decay_rate=0.995,
+        input_size=42,
+        hidden_size=128,
+        output_size=7,
+    ):
         self.alpha = alpha  # Tasa de aprendizaje
         self.gamma = gamma  # Factor de descuento
         self.epsilon = epsilon  # Probabilidad de exploración
@@ -32,7 +42,7 @@ class TDAgent:
     def state_to_tensor(self, board):
         # Convierte el estado del tablero en un tensor de PyTorch
         return torch.tensor(board.flatten(), dtype=torch.float32)
-    
+
     def decay_epsilon(self):
         self.epsilon = max(self.min_epsilon, self.epsilon * self.decay_rate)
 
@@ -67,6 +77,7 @@ class TDAgent:
         loss.backward()
         self.optimizer.step()
 
+
 def train_td_agent(agent, game, episodes=5000):
     for episode in range(episodes):
         game.reset()
@@ -99,6 +110,5 @@ def train_td_agent(agent, game, episodes=5000):
             agent.update_q_values(game.board, action, reward, next_board, done)
 
             turn += 1
-        
-        agent.decay_epsilon()
 
+        agent.decay_epsilon()
