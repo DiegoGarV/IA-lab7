@@ -3,23 +3,22 @@ import matplotlib.pyplot as plt
 from board_and_rules import Connect4, minimax
 from td_agent import TDAgent, train_td_agent
 
-
 RESULTADOS_FILE = "resultados.csv"
 
 
 def guardar_resultado(modo, ganador):
-    # Guarda el resultado de cada partida en un archivo CSV.
     try:
         df = pd.read_csv(RESULTADOS_FILE)
     except FileNotFoundError:
         df = pd.DataFrame(columns=["modo", "ganador"])
 
-    df = pd.concat([df, pd.DataFrame({"modo": [modo], "ganador": [ganador]})], ignore_index=True)
+    df = pd.concat(
+        [df, pd.DataFrame({"modo": [modo], "ganador": [ganador]})], ignore_index=True
+    )
     df.to_csv(RESULTADOS_FILE, index=False)
 
 
 def graficar_resultados():
-    # Genera y actualiza una gráfica con los resultados de las partidas.
     try:
         df = pd.read_csv(RESULTADOS_FILE)
     except FileNotFoundError:
@@ -28,11 +27,9 @@ def graficar_resultados():
 
     conteo = df.groupby(["modo", "ganador"]).size().unstack(fill_value=0)
 
-    # Modos de juego
     modos = ["1 - Jugador vs TDL", "2 - TDL vs Minimax", "3 - TDL vs Minimax+Poda"]
     ganadores = ["Jugador", "Minimax", "Empate", "TDL"]
 
-    # Asegurar que todas las combinaciones tengan valores (evita errores si no hay datos)
     for ganador in ganadores:
         if ganador not in conteo.columns:
             conteo[ganador] = 0
@@ -52,13 +49,54 @@ def graficar_resultados():
     plt.show()
 
 
+def jugar_modo_automatico(td_agent, modo, repeticiones=50):
+    game = Connect4()
+
+    for i in range(repeticiones):
+        print(f"\nPartida {i + 1} de {repeticiones} (Modo {modo})")
+        game.reset()
+        turn = 1
+
+        while True:
+            player = 1 if turn % 2 != 0 else 2
+
+            if player == 1:
+                valid_actions = game.get_valid_columns()
+                column = td_agent.select_action(game.board, valid_actions)
+            else:
+                use_alpha_beta = modo == "3"
+                column, _ = minimax(
+                    game,
+                    4,
+                    -float("inf"),
+                    float("inf"),
+                    True,
+                    player,
+                    use_alpha_beta,
+                )
+
+            game.drop_piece(column, player)
+
+            if game.check_winner(player):
+                print(f"Ganador: Jugador {player}")
+                guardar_resultado(modo, "TDL" if player == 1 else "Minimax")
+                break
+
+            if len(game.get_valid_columns()) == 0:
+                print("Empate")
+                guardar_resultado(modo, "Empate")
+                break
+
+            turn += 1
+
+
 def play_game():
     td_agent = TDAgent()
     game = Connect4()
 
     print("Agente de TD learning entrenando")
     train_td_agent(agent=td_agent, game=game, episodes=5000)
-    print("El agente a terminado de entrenar")
+    print("El agente ha terminado de entrenar")
 
     while True:
         game.reset()
@@ -68,11 +106,25 @@ def play_game():
         print("2 - IA (TDL) vs IA (Minimax sin poda)")
         print("3 - IA (TDL) vs IA (Minimax con poda)")
         print("4 - Ver gráficas")
+        print("5 - Exit")
+        print("6 - Simular 50 partidas (Modo 2 o 3)")
 
         mode = input("\nIngresa el número de la opción: ")
 
         if mode == "4":
             graficar_resultados()
+            continue
+
+        if mode == "5":
+            break
+
+        if mode == "6":
+            sim_mode = input("¿Simular Modo 2 o 3?: ").strip()
+            if sim_mode in ["2", "3"]:
+                jugar_modo_automatico(td_agent, sim_mode, repeticiones=50)
+                graficar_resultados()
+            else:
+                print("Modo inválido. Solo se permite 2 o 3.")
             continue
 
         turn = 1
@@ -81,9 +133,10 @@ def play_game():
             player = 1 if turn % 2 != 0 else 2
 
             if mode == "1" and player == 1:
-                # Modo 1: Jugador vs IA (TD Learning)
                 try:
-                    column = int(input(f"Jugador {player}, elige una columna (1-7): ")) - 1
+                    column = (
+                        int(input(f"Jugador {player}, elige una columna (1-7): ")) - 1
+                    )
                 except ValueError:
                     print("Entrada inválida. Intenta nuevamente.")
                     continue
@@ -99,18 +152,23 @@ def play_game():
                 game.drop_piece(column, player)
             else:
                 if (mode == "1" and player == 2) or mode in ["2", "3"]:
-                    # IA (TD Learning) juega
                     valid_actions = game.get_valid_columns()
                     column = td_agent.select_action(game.board, valid_actions)
                 else:
-                    # IA (Minimax) juega
                     use_alpha_beta = mode == "3"
-                    column, _ = minimax(game, 4, -float("inf"), float("inf"), True, player, use_alpha_beta)
+                    column, _ = minimax(
+                        game,
+                        4,
+                        -float("inf"),
+                        float("inf"),
+                        True,
+                        player,
+                        use_alpha_beta,
+                    )
 
                 print(f"Jugador {player} elige la columna: {column+1}")
                 game.drop_piece(column, player)
 
-            # Verificar ganador
             if game.check_winner(player):
                 game.print_board()
                 print(f"¡Jugador {player} ha ganado!")
